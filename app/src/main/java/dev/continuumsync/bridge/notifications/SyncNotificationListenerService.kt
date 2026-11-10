@@ -1,13 +1,11 @@
 package dev.continuumsync.bridge.notifications
 
 import android.app.Notification
-import android.app.RemoteInput
 import android.content.Intent
 import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import dev.continuumsync.bridge.crypto.E2ECryptoManager
-import dev.continuumsync.bridge.transport.HybridTransportEngine
+import dev.continuumsync.bridge.data.SyncRepository
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
@@ -34,31 +32,29 @@ class SyncNotificationListenerService : NotificationListenerService() {
             replyActionsCache[sbn.key] = replyAction
         }
 
-        val payloadJson = JSONObject().apply {
-            put("type", "NOTIFICATION_POST")
-            put("sbnKey", sbn.key)
-            put("packageName", sbn.packageName)
-            put("title", title)
-            put("body", text)
-            put("canReplyInline", replyAction != null)
-            put("timestamp", sbn.postTime)
-        }.toString()
+        val payload = JSONObject()
+            .put("id", "${sbn.key}@${sbn.postTime}")
+            .put("originDevice", SyncRepository.prefs.role)
+            .put("appName", appLabel(sbn.packageName))
+            .put("title", title)
+            .put("content", text)
 
-        HybridTransportEngine.sendEncrypted(
-            E2ECryptoManager.seal(payloadJson.toByteArray(Charsets.UTF_8))
-        )
+        SyncRepository.postEventAsync("NOTIFICATION_POST", payload)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        if (sbn.packageName == packageName) return
         replyActionsCache.remove(sbn.key)
-        val cancelJson = JSONObject().apply {
-            put("type", "NOTIFICATION_CANCEL")
-            put("sbnKey", sbn.key)
-        }.toString()
 
-        HybridTransportEngine.sendEncrypted(
-            E2ECryptoManager.seal(cancelJson.toByteArray(Charsets.UTF_8))
-        )
+        val payload = JSONObject().put("id", "${sbn.key}@${sbn.postTime}")
+        SyncRepository.postEventAsync("NOTIFICATION_DISMISS", payload)
+    }
+
+    private fun appLabel(pkg: String): String = try {
+        val info = packageManager.getApplicationInfo(pkg, 0)
+        packageManager.getApplicationLabel(info).toString()
+    } catch (_: Exception) {
+        pkg.substringAfterLast('.')
     }
 
     fun handleRemoteDismissCommand(sbnKey: String) {
@@ -73,7 +69,7 @@ class SyncNotificationListenerService : NotificationListenerService() {
         for (remoteInput in remoteInputs) {
             resultsBundle.putCharSequence(remoteInput.resultKey, replyText)
         }
-        RemoteInput.addResultsToIntent(remoteInputs, fillInIntent, resultsBundle)
+        android.app.RemoteInput.addResultsToIntent(remoteInputs, fillInIntent, resultsBundle)
         action.actionIntent.send(applicationContext, 0, fillInIntent)
     }
 }

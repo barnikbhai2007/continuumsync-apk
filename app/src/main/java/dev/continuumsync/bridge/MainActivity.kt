@@ -2,94 +2,63 @@ package dev.continuumsync.bridge
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
-import android.widget.Button
-import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
-import dev.continuumsync.bridge.calls.CallSyncController
-import dev.continuumsync.bridge.crypto.E2ECryptoManager
-import dev.continuumsync.bridge.transport.HybridTransportEngine
+import androidx.core.content.ContextCompat
+import dev.continuumsync.bridge.data.SyncRepository
+import dev.continuumsync.bridge.service.SyncForegroundService
+import dev.continuumsync.bridge.ui.ContinuumApp
+import dev.continuumsync.bridge.ui.theme.ContinuumTheme
 
-class MainActivity : AppCompatActivity() {
-
-    private lateinit var callSyncController: CallSyncController
+class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize default 256-bit pairing key (replace via QR scan in production)
-        E2ECryptoManager.initializeWithDerivedKey(
-            "ContinuumSync2026SharedKey32Byte".toByteArray(Charsets.UTF_8)
+        SyncRepository.init(applicationContext)
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
         )
 
-        callSyncController = CallSyncController(this).also {
-            it.registerCallStateObserver()
-        }
-
-        HybridTransportEngine.startLanDiscovery(this)
-
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(48, 72, 48, 48)
-        }
-
-        val title = TextView(this).apply {
-            text = "ContinuumSync — Dual-Phone Bridge"
-            textSize = 20f
-        }
-        val subtitle = TextView(this).apply {
-            text = "Complete the 3 non-root permission toggles below on both Phone A and Phone B."
-            setPadding(0, 16, 0, 32)
-        }
-
-        val btnNotifications = Button(this).apply {
-            text = "1. Grant Notification Listener Access"
-            setOnClickListener {
-                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        setContent {
+            ContinuumTheme {
+                ContinuumApp()
             }
         }
 
-        val btnAccessibility = Button(this).apply {
-            text = "2. Enable Accessibility Clipboard Sync"
-            setOnClickListener {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }
-        }
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, SyncForegroundService::class.java)
+        )
 
-        val btnCallPermissions = Button(this).apply {
-            text = "3. Grant Call Answer / Reject Permissions"
-            setOnClickListener {
-                requestCallAndBluetoothPermissions()
-            }
-        }
-
-        root.addView(title)
-        root.addView(subtitle)
-        root.addView(btnNotifications)
-        root.addView(btnAccessibility)
-        root.addView(btnCallPermissions)
-
-        setContentView(root)
+        requestMissingPermissions()
     }
 
-    private fun requestCallAndBluetoothPermissions() {
-        val perms = mutableListOf(
+    private fun requestMissingPermissions() {
+        val permissions = mutableListOf(
             Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.READ_CONTACTS,
             Manifest.permission.ANSWER_PHONE_CALLS
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            perms.add(Manifest.permission.BLUETOOTH_CONNECT)
-            perms.add(Manifest.permission.BLUETOOTH_SCAN)
+            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            perms.add(Manifest.permission.POST_NOTIFICATIONS)
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }
-        ActivityCompat.requestPermissions(this, perms.toTypedArray(), 1001)
+
+        val missing = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, missing.toTypedArray(), 1001)
+        }
     }
 }

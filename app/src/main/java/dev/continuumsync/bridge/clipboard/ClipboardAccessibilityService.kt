@@ -9,15 +9,16 @@ import android.os.Build
 import android.os.PersistableBundle
 import android.service.quicksettings.TileService
 import android.view.accessibility.AccessibilityEvent
-import dev.continuumsync.bridge.crypto.E2ECryptoManager
-import dev.continuumsync.bridge.transport.HybridTransportEngine
+import android.widget.Toast
+import dev.continuumsync.bridge.data.ClipboardGuard
+import dev.continuumsync.bridge.data.SyncRepository
 import org.json.JSONObject
-import java.security.MessageDigest
 
 class ClipboardAccessibilityService : AccessibilityService() {
 
     private lateinit var clipboardManager: ClipboardManager
     private var lastSyncedHash: String = ""
+    private var lastReadAt: Long = 0L
 
     override fun onServiceConnected() {
         clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -29,6 +30,9 @@ class ClipboardAccessibilityService : AccessibilityService() {
             event.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED
 
         if (isCopyAction) {
+            val now = System.currentTimeMillis()
+            if (now - lastReadAt < 900L) return
+            lastReadAt = now
             tryReadAndPushClipboard()
         }
     }
@@ -38,21 +42,16 @@ class ClipboardAccessibilityService : AccessibilityService() {
         if (clip.itemCount == 0) return
         val text = clip.getItemAt(0).coerceToText(this)?.toString() ?: return
         if (text.isBlank()) return
+        if (ClipboardGuard.shouldIgnore(text)) return
 
-        val currentHash = sha256Hex(text)
+        val currentHash = ClipboardGuard.sha256(text)
         if (currentHash == lastSyncedHash) return
         lastSyncedHash = currentHash
 
-        val json = JSONObject().apply {
-            put("type", "CLIPBOARD_PUSH")
-            put("text", text)
-            put("sha256", currentHash)
-            put("timestamp", System.currentTimeMillis())
-        }.toString()
-
-        HybridTransportEngine.sendEncrypted(
-            E2ECryptoManager.seal(json.toByteArray(Charsets.UTF_8))
-        )
+        val payload = JSONObject()
+            .put("text", text)
+            .put("sourceDevice", SyncRepository.prefs.role)
+        SyncRepository.postEventAsync("CLIPBOARD_SYNC", payload)
     }
 
     fun applyIncomingClipboard(text: String, incomingHash: String) {
@@ -67,28 +66,23 @@ class ClipboardAccessibilityService : AccessibilityService() {
     }
 
     override fun onInterrupt() {}
-
-    private fun sha256Hex(input: String): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(input.toByteArray())
-            .joinToString("") { "%02x".format(it) }
 }
 
 class ClipboardTileService : TileService() {
     override fun onClick() {
         super.onClick()
         val clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val text = clipboardManager.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString() ?: return
-        if (text.isBlank()) return
+        val text = clipboardManager.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()
+        if (text.isNullOrBlank()) {
+            Toast.makeText(this, "Clipboard is empty", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-        val json = JSONObject().apply {
-            put("type", "CLIPBOARD_PUSH")
-            put("text", text)
-            put("timestamp", System.currentTimeMillis())
-        }.toString()
-
-        HybridTransportEngine.sendEncrypted(
-            E2ECryptoManager.seal(json.toByteArray(Charsets.UTF_8))
-        )
+        ClipboardGuard.mark(text)
+        val payload = JSONObject()
+            .put("text", text)
+            .put("sourceDevice", SyncRepository.prefs.role)
+        SyncRepository.postEventAsync("CLIPBOARD_SYNC", payload)
+        Toast.makeText(this, "Clipboard sent to paired phone", Toast.LENGTH_SHORT).show()
     }
 }
