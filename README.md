@@ -6,10 +6,11 @@ A native two-phone bridge for [ContinuumSync](https://github.com/barnikbhai2007/
 
 **[Download the latest APK](https://github.com/barnikbhai2007/continuumsync-apk/releases/latest)**
 
-The APK is built automatically by GitHub Actions on every push to `main`. It is debug-signed, so Android will ask you to allow installs from your browser or file manager.
+The APK is built automatically by GitHub Actions on every push to `main`. From 2.0.1 onward it is signed with a stable project key, so new 2.0.x builds install over the previous one. Android will ask you to allow installs from your browser or file manager.
 
 - Minimum: Android 9 (API 28)
 - Target: Android 15 (API 35)
+- Size: about 2 MB
 
 ## What the app does
 
@@ -41,10 +42,10 @@ The APK is built automatically by GitHub Actions on every push to `main`. It is 
 The build runs on GitHub Actions using JDK 17 and Gradle 8.9:
 
 ```bash
-gradle assembleDebug
+gradle assembleRelease
 ```
 
-The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+The APK is written to `app/build/outputs/apk/release/app-release.apk`.
 
 ## Project layout
 
