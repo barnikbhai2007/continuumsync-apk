@@ -27,13 +27,20 @@ class SyncPrefs(context: Context) {
             prefs.edit().putString(KEY_ROLE, if (value == ROLE_B) ROLE_B else ROLE_A).apply()
         }
 
+    var autoDiscover: Boolean
+        get() = prefs.getBoolean(KEY_AUTO_DISCOVER, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_AUTO_DISCOVER, value).apply()
+        }
+
     companion object {
-        const val DEFAULT_BASE_URL = "http://192.168.31.166:3100"
+        const val DEFAULT_BASE_URL = "http://127.0.0.1:3100"
         const val DEFAULT_ROOM = "482-910"
 
         private const val KEY_BASE_URL = "base_url"
         private const val KEY_ROOM = "room"
         private const val KEY_ROLE = "role"
+        private const val KEY_AUTO_DISCOVER = "auto_discover"
 
         fun normalizeBaseUrl(raw: String): String {
             var value = raw.trim()

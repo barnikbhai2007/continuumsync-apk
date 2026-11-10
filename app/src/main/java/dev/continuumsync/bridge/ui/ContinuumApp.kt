@@ -19,6 +19,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -89,6 +90,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -101,6 +103,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.continuumsync.bridge.R
 import dev.continuumsync.bridge.data.CallSnapshot
 import dev.continuumsync.bridge.data.ClipboardSnapshot
 import dev.continuumsync.bridge.data.ConnectionState
@@ -111,6 +114,7 @@ import dev.continuumsync.bridge.data.SyncPrefs
 import dev.continuumsync.bridge.data.SyncRepository
 import dev.continuumsync.bridge.data.peerRole
 import dev.continuumsync.bridge.data.roleLabel
+import dev.continuumsync.bridge.host.EmbeddedSyncServer
 import dev.continuumsync.bridge.ui.theme.Amber
 import dev.continuumsync.bridge.ui.theme.Bg
 import dev.continuumsync.bridge.ui.theme.Card
@@ -132,6 +136,8 @@ fun ContinuumApp() {
     val context = LocalContext.current
     val snapshot by SyncRepository.snapshot.collectAsStateWithLifecycle()
     val connection by SyncRepository.connection.collectAsStateWithLifecycle()
+    val hostInfo by EmbeddedSyncServer.info.collectAsStateWithLifecycle()
+    val joinedHost by SyncRepository.joinedHost.collectAsStateWithLifecycle()
 
     val prefs = SyncRepository.prefs
     var baseUrl by remember { mutableStateOf(prefs.baseUrl) }
@@ -143,7 +149,10 @@ fun ContinuumApp() {
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) permissionTick += 1
+            if (event == Lifecycle.Event.ON_RESUME) {
+                permissionTick += 1
+                EmbeddedSyncServer.refreshAddress()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
@@ -201,15 +210,27 @@ fun ContinuumApp() {
                         baseUrl = baseUrl,
                         connection = connection,
                         peers = peers,
+                        hostUrl = hostInfo.displayUrl,
+                        hostError = hostInfo.error,
+                        joinedHost = joinedHost,
                         onToggleRole = {
                             val next = if (role == ROLE_A) ROLE_B else ROLE_A
                             role = next
                             SyncRepository.setRole(next)
                             Toast.makeText(
                                 context,
-                                "This phone is now ${roleLabel(next)}",
+                                if (next == ROLE_A) {
+                                    "This phone now hosts the room"
+                                } else {
+                                    "This phone now joins Phone A"
+                                },
                                 Toast.LENGTH_SHORT
                             ).show()
+                        },
+                        onScan = {
+                            SyncRepository.scanForHost()
+                            Toast.makeText(context, "Scanning for Phone A...", Toast.LENGTH_SHORT)
+                                .show()
                         },
                         onEdit = { showSettings = true }
                     )
@@ -306,7 +327,10 @@ fun ContinuumApp() {
 
                 item {
                     Footer(
+                        role = role,
                         baseUrl = baseUrl,
+                        hostUrl = hostInfo.displayUrl,
+                        joinedHost = joinedHost,
                         connection = connection,
                         onRetry = { SyncRepository.start() }
                     )
@@ -320,14 +344,21 @@ fun ContinuumApp() {
             initialUrl = baseUrl,
             initialRoom = room,
             initialRole = role,
+            initialAutoDiscover = prefs.autoDiscover,
             onDismiss = { showSettings = false },
-            onSave = { nextUrl, nextRoom, nextRole ->
+            onSave = { nextUrl, nextRoom, nextRole, nextAutoDiscover ->
+                prefs.autoDiscover = nextAutoDiscover
                 baseUrl = SyncPrefs.normalizeBaseUrl(nextUrl)
                 room = SyncPrefs.normalizeRoom(nextRoom)
                 role = nextRole
                 SyncRepository.updateConfig(baseUrl, room, role)
                 showSettings = false
-                Toast.makeText(context, "Reconnecting to room $room", Toast.LENGTH_SHORT).show()
+                val message = if (role == ROLE_A) {
+                    "Hosting room $room on this phone"
+                } else {
+                    "Joining room $room over Wi-Fi"
+                }
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -341,24 +372,17 @@ private fun TopBar(connection: ConnectionState, peers: Int, onSettings: () -> Un
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
-                .size(38.dp)
+        Image(
+            painter = painterResource(R.drawable.ic_logo_badge),
+            contentDescription = "ContinuumSync logo",
+            modifier = Modifier
+                .size(40.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(Brush.linearGradient(listOf(Primary, Mint))),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                Icons.Rounded.Link,
-                contentDescription = null,
-                tint = Bg,
-                modifier = Modifier.size(21.dp)
-            )
-        }
+        )
         Spacer(Modifier.width(11.dp))
         Column(Modifier.weight(1f)) {
             Text("ContinuumSync", style = MaterialTheme.typography.titleLarge, color = TextHi)
-            Text("dual-phone bridge", style = MaterialTheme.typography.bodyMedium, color = TextLow)
+            Text("two phones · one flow", style = MaterialTheme.typography.bodyMedium, color = TextLow)
         }
         StatusPill(connection = connection, peers = peers)
         Spacer(Modifier.width(2.dp))
@@ -433,16 +457,30 @@ private fun PairingCard(
     baseUrl: String,
     connection: ConnectionState,
     peers: Int,
+    hostUrl: String?,
+    hostError: String?,
+    joinedHost: String,
     onToggleRole: () -> Unit,
+    onScan: () -> Unit,
     onEdit: () -> Unit
 ) {
+    val context = LocalContext.current
+    val isHost = role == ROLE_A
+    val remoteLabel = joinedHost.ifBlank {
+        if (isLoopbackAddress(baseUrl)) "" else hostLabel(baseUrl)
+    }
+
     SectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("PAIRING ROOM", style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Text(
+                if (isHost) "HOSTING ROOM" else "PAIRING ROOM",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextLow
+            )
             Spacer(Modifier.weight(1f))
             Pill(
-                text = "This phone · ${if (role == ROLE_A) "A" else "B"}",
-                color = Primary
+                text = "This phone · ${if (isHost) "A · host" else "B"}",
+                color = if (isHost) Mint else Primary
             )
         }
         Spacer(Modifier.height(10.dp))
@@ -457,20 +495,132 @@ private fun PairingCard(
         )
         Spacer(Modifier.height(6.dp))
         Text(
-            "Open ContinuumSync on the other phone, switch it to ${if (role == ROLE_A) "Phone B" else "Phone A"}, and use this same room.",
+            if (isHost) {
+                "This phone owns the room. The other phone joins it directly over Wi-Fi - no computer needed."
+            } else {
+                "Joining the room hosted by Phone A on the same Wi-Fi."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = TextLow
         )
+
+        Spacer(Modifier.height(16.dp))
+        if (isHost) {
+            if (hostUrl != null) {
+                Text("HOST ADDRESS", style = MaterialTheme.typography.labelSmall, color = TextLow)
+                Spacer(Modifier.height(7.dp))
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(CardSoft)
+                        .border(1.dp, Stroke, RoundedCornerShape(13.dp))
+                        .padding(start = 13.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        hostUrl,
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            fontFamily = FontFamily.Monospace,
+                            fontSize = 14.sp
+                        ),
+                        color = TextHi,
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = {
+                            val manager = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                                as ClipboardManager
+                            manager.setPrimaryClip(
+                                android.content.ClipData.newPlainText(
+                                    "ContinuumSync host",
+                                    hostUrl
+                                )
+                            )
+                            Toast.makeText(context, "Host address copied", Toast.LENGTH_SHORT)
+                                .show()
+                        }
+                    ) {
+                        Icon(
+                            Icons.Rounded.ContentCopy,
+                            contentDescription = "Copy host address",
+                            tint = Mint,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "On the other phone choose Phone B. It finds this address automatically, or you can type it in Settings.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextLow
+                )
+            } else {
+                Text(
+                    hostError ?: "Connect this phone to Wi-Fi to start hosting the room.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Amber
+                )
+            }
+        } else {
+            Text("CONNECTED THROUGH", style = MaterialTheme.typography.labelSmall, color = TextLow)
+            Spacer(Modifier.height(7.dp))
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(CardSoft)
+                    .border(1.dp, Stroke, RoundedCornerShape(13.dp))
+                    .padding(horizontal = 13.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    remoteLabel.ifBlank { "Searching for Phone A..." },
+                    style = MaterialTheme.typography.bodyLarge.copy(
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 14.sp
+                    ),
+                    color = if (remoteLabel.isBlank()) Amber else TextHi,
+                    modifier = Modifier.weight(1f)
+                )
+                if (remoteLabel.isBlank()) {
+                    TextButton(onClick = onScan) {
+                        Icon(
+                            Icons.Rounded.Refresh,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(Modifier.width(5.dp))
+                        Text("Scan", color = Primary)
+                    }
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "Keep both phones on the same Wi-Fi and Phone A open. If Phone A changes, tap Scan or enter its address in Settings.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextLow
+            )
+        }
+
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InfoChip(
                 icon = Icons.Rounded.Devices,
-                text = if (peers >= 2) "$peers devices linked" else "Waiting for peer",
+                text = when {
+                    peers >= 2 -> "$peers phones linked"
+                    isHost -> "Waiting for Phone B"
+                    else -> "Looking for Phone A"
+                },
                 color = if (peers >= 2) Mint else Amber
             )
             InfoChip(
                 icon = Icons.Rounded.Wifi,
-                text = hostLabel(baseUrl),
+                text = if (isHost) {
+                    if (hostUrl != null) "Hosting on Wi-Fi" else "No Wi-Fi"
+                } else {
+                    remoteLabel.ifBlank { "Same Wi-Fi" }
+                },
                 color = if (connection == ConnectionState.OFFLINE) Danger else TextMid
             )
         }
@@ -487,12 +637,16 @@ private fun PairingCard(
                 ),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Icon(Icons.Rounded.Smartphone, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(
+                    Icons.Rounded.Smartphone,
+                    contentDescription = null,
+                    modifier = Modifier.size(16.dp)
+                )
                 Spacer(Modifier.width(7.dp))
-                Text(if (role == ROLE_A) "Switch to Phone B" else "Switch to Phone A")
+                Text(if (isHost) "Switch to Phone B" else "Switch to Phone A")
             }
             TextButton(onClick = onEdit) {
-                Text("Server & room", color = TextMid)
+                Text("Settings", color = TextMid)
             }
         }
     }
@@ -940,7 +1094,21 @@ private fun PermissionRow(
 }
 
 @Composable
-private fun Footer(baseUrl: String, connection: ConnectionState, onRetry: () -> Unit) {
+private fun Footer(
+    role: String,
+    baseUrl: String,
+    hostUrl: String?,
+    joinedHost: String,
+    connection: ConnectionState,
+    onRetry: () -> Unit
+) {
+    val endpoint = if (role == ROLE_A) {
+        hostUrl?.let { "hosting ${hostLabel(it)}" } ?: "not on Wi-Fi"
+    } else {
+        joinedHost.takeIf { it.isNotBlank() }?.let { "joined ${hostLabel(it)}" }
+            ?: "searching for Phone A"
+    }
+
     Column(
         Modifier
             .fillMaxWidth()
@@ -948,7 +1116,7 @@ private fun Footer(baseUrl: String, connection: ConnectionState, onRetry: () -> 
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "ContinuumSync 2.0.1 · ${hostLabel(baseUrl)}",
+            "ContinuumSync 2.1.0 · $endpoint",
             style = MaterialTheme.typography.bodyMedium,
             color = TextLow,
             textAlign = TextAlign.Center
@@ -969,12 +1137,15 @@ private fun SettingsSheet(
     initialUrl: String,
     initialRoom: String,
     initialRole: String,
+    initialAutoDiscover: Boolean,
     onDismiss: () -> Unit,
-    onSave: (String, String, String) -> Unit
+    onSave: (String, String, String, Boolean) -> Unit
 ) {
+    val context = LocalContext.current
     var url by remember { mutableStateOf(initialUrl) }
     var roomCode by remember { mutableStateOf(initialRoom) }
     var role by remember { mutableStateOf(initialRole) }
+    var autoDiscover by remember { mutableStateOf(initialAutoDiscover) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -992,22 +1163,15 @@ private fun SettingsSheet(
             Text("Connection settings", style = MaterialTheme.typography.headlineMedium, color = TextHi)
             Spacer(Modifier.height(4.dp))
             Text(
-                "Both phones must point to the same sync server and room.",
+                if (role == ROLE_A) {
+                    "Phone A hosts the room itself. Both phones only need the same room code and Wi-Fi network."
+                } else {
+                    "Phone B joins the room hosted by Phone A on the same Wi-Fi. No computer required."
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = TextLow
             )
             Spacer(Modifier.height(18.dp))
-            OutlinedTextField(
-                value = url,
-                onValueChange = { url = it },
-                label = { Text("Sync server URL") },
-                placeholder = { Text("http://192.168.1.10:3100") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = fieldColors()
-            )
-            Spacer(Modifier.height(12.dp))
             OutlinedTextField(
                 value = roomCode,
                 onValueChange = { roomCode = it },
@@ -1017,18 +1181,66 @@ private fun SettingsSheet(
                 shape = RoundedCornerShape(12.dp),
                 colors = fieldColors()
             )
+            Spacer(Modifier.height(12.dp))
+            if (role == ROLE_B) {
+                OutlinedTextField(
+                    value = url,
+                    onValueChange = { url = it },
+                    label = { Text("Phone A address (optional)") },
+                    placeholder = { Text("Found automatically on Wi-Fi") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    colors = fieldColors()
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    androidx.compose.material3.Switch(
+                        checked = autoDiscover,
+                        onCheckedChange = { autoDiscover = it },
+                        colors = androidx.compose.material3.SwitchDefaults.colors(
+                            checkedThumbColor = Color(0xFF07132C),
+                            checkedTrackColor = Primary
+                        )
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Find Phone A automatically",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = TextMid
+                    )
+                }
+                TextButton(
+                    onClick = {
+                        SyncRepository.scanForHost()
+                        onDismiss()
+                        Toast.makeText(context, "Scanning Wi-Fi for Phone A...", Toast.LENGTH_SHORT)
+                            .show()
+                    }
+                ) {
+                    Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text("Scan for Phone A now", color = Primary)
+                }
+            } else {
+                Text(
+                    "This phone opens a small sync server automatically. Phone B will find it over Wi-Fi.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = TextLow
+                )
+            }
             Spacer(Modifier.height(18.dp))
             Text("THIS PHONE IS", style = MaterialTheme.typography.labelSmall, color = TextLow)
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 RoleOption(
-                    label = "Phone A",
+                    label = "Phone A · Host",
                     selected = role == ROLE_A,
                     onClick = { role = ROLE_A },
                     modifier = Modifier.weight(1f)
                 )
                 RoleOption(
-                    label = "Phone B",
+                    label = "Phone B · Join",
                     selected = role == ROLE_B,
                     onClick = { role = ROLE_B },
                     modifier = Modifier.weight(1f)
@@ -1040,13 +1252,14 @@ private fun SettingsSheet(
                     onClick = {
                         url = SyncPrefs.DEFAULT_BASE_URL
                         roomCode = SyncPrefs.DEFAULT_ROOM
+                        autoDiscover = true
                     }
                 ) {
                     Text("Reset defaults", color = TextMid)
                 }
                 Spacer(Modifier.weight(1f))
                 Button(
-                    onClick = { onSave(url, roomCode, role) },
+                    onClick = { onSave(url, roomCode, role, autoDiscover) },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = Primary,
                         contentColor = Color(0xFF07132C)
@@ -1165,6 +1378,13 @@ private fun accentFor(name: String): Color {
 
 private fun hostLabel(url: String): String =
     url.removePrefix("https://").removePrefix("http://").trimEnd('/')
+
+private fun isLoopbackAddress(url: String): Boolean {
+    val lower = url.lowercase()
+    return lower.contains("127.0.0.1") ||
+        lower.contains("localhost") ||
+        lower.contains("0.0.0.0")
+}
 
 private fun hasNotificationAccess(context: Context): Boolean =
     NotificationManagerCompat.getEnabledListenerPackages(context).contains(context.packageName)

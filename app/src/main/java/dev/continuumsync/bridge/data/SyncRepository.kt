@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
+import dev.continuumsync.bridge.host.EmbeddedSyncServer
+import dev.continuumsync.bridge.host.HostDiscovery
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +43,9 @@ object SyncRepository {
     private val _configVersion = kotlinx.coroutines.flow.MutableStateFlow(0)
     val configVersion = _configVersion
 
+    private val _joinedHost = kotlinx.coroutines.flow.MutableStateFlow("")
+    val joinedHost = _joinedHost
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var streamJob: Job? = null
 
@@ -49,6 +54,9 @@ object SyncRepository {
 
     @Volatile
     private var lastAppliedClip: String = ""
+
+    @Volatile
+    private var activeBaseUrl: String = ""
 
     fun init(context: Context) {
         if (initialized) return
@@ -63,6 +71,7 @@ object SyncRepository {
 
     fun start() {
         if (!initialized) return
+        activeBaseUrl = ""
         streamJob?.cancel()
         try {
             activeConnection?.disconnect()
@@ -87,10 +96,71 @@ object SyncRepository {
         start()
     }
 
+    fun scanForHost() {
+        if (!initialized) return
+        val room = SyncPrefs.normalizeRoom(prefs.room)
+        scope.launch {
+            _connection.value = ConnectionState.CONNECTING
+            val found = HostDiscovery.findHost(room, timeoutMs = 3000)
+            if (found != null) {
+                prefs.baseUrl = found
+                _joinedHost.value = found
+                start()
+            } else {
+                _connection.value = ConnectionState.OFFLINE
+            }
+        }
+    }
+
+    private suspend fun resolveBaseUrl(room: String): String? {
+        if (prefs.role == ROLE_A) {
+            val port = EmbeddedSyncServer.ensureStarted(room)
+            EmbeddedSyncServer.refreshAddress()
+            if (port == null) {
+                _joinedHost.value = ""
+                return null
+            }
+            _joinedHost.value = ""
+            return "http://127.0.0.1:$port"
+        }
+
+        if (EmbeddedSyncServer.isRunning()) {
+            EmbeddedSyncServer.stop()
+        }
+
+        if (prefs.autoDiscover) {
+            val discovered = HostDiscovery.findHost(room)
+            if (discovered != null) {
+                if (discovered != prefs.baseUrl) {
+                    prefs.baseUrl = discovered
+                }
+                _joinedHost.value = discovered
+                return discovered
+            }
+        }
+
+        val configured = SyncPrefs.normalizeBaseUrl(prefs.baseUrl)
+        _joinedHost.value = if (isLoopback(configured)) "" else configured
+        return configured
+    }
+
+    private fun isLoopback(url: String): Boolean {
+        val lower = url.lowercase()
+        return lower.contains("127.0.0.1") ||
+            lower.contains("localhost") ||
+            lower.contains("0.0.0.0")
+    }
+
     private suspend fun streamLoop() {
         while (coroutineContext.isActive) {
-            val base = SyncPrefs.normalizeBaseUrl(prefs.baseUrl)
             val room = SyncPrefs.normalizeRoom(prefs.room)
+            val base = resolveBaseUrl(room)
+            if (base == null) {
+                _connection.value = ConnectionState.OFFLINE
+                delay(3000)
+                continue
+            }
+            activeBaseUrl = base
             var connection: HttpURLConnection? = null
             var connectedOnce = false
 
@@ -227,11 +297,21 @@ object SyncRepository {
         }
     }
 
+    private suspend fun postBaseUrl(room: String): String {
+        if (prefs.role == ROLE_A) {
+            val port = EmbeddedSyncServer.ensureStarted(room)
+            if (port != null) return "http://127.0.0.1:$port"
+        }
+        val cached = activeBaseUrl
+        if (cached.isNotBlank()) return SyncPrefs.normalizeBaseUrl(cached)
+        return SyncPrefs.normalizeBaseUrl(prefs.baseUrl)
+    }
+
     suspend fun postEvent(eventType: String, payload: JSONObject): Boolean =
         withContext(Dispatchers.IO) {
             if (!initialized) return@withContext false
-            val base = SyncPrefs.normalizeBaseUrl(prefs.baseUrl)
             val room = SyncPrefs.normalizeRoom(prefs.room)
+            val base = postBaseUrl(room)
             try {
                 val connection = (URL("$base/api/sync/event").openConnection() as HttpURLConnection)
                     .apply {
