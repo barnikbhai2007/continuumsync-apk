@@ -6,12 +6,45 @@ import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import dev.continuumsync.bridge.data.SyncRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 class SyncNotificationListenerService : NotificationListenerService() {
 
     private val replyActionsCache = ConcurrentHashMap<String, Notification.Action>()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val handledRemoteDismissals = mutableSetOf<String>()
+
+    override fun onCreate() {
+        super.onCreate()
+        scope.launch {
+            SyncRepository.snapshot.collect { snapshot ->
+                if (snapshot == null) return@collect
+                val myRole = SyncRepository.prefs.role
+                for (item in snapshot.notifications) {
+                    if (!item.dismissed || item.originDevice != myRole) continue
+                    if (!handledRemoteDismissals.add(item.id)) continue
+                    val sbnKey = item.id.substringBeforeLast("@")
+                    if (sbnKey.isNotBlank()) {
+                        try {
+                            cancelNotification(sbnKey)
+                        } catch (_: Exception) {
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        scope.cancel()
+        super.onDestroy()
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return

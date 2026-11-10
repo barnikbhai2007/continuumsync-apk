@@ -95,7 +95,10 @@ object SyncRepository {
             var connectedOnce = false
 
             try {
-                val url = URL("$base/api/sync/stream?room=${URLEncoder.encode(room, "UTF-8")}")
+                val url = URL(
+                    "$base/api/sync/stream?room=${URLEncoder.encode(room, "UTF-8")}" +
+                        "&device=${URLEncoder.encode(prefs.role, "UTF-8")}"
+                )
                 connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
                     connectTimeout = 8000

@@ -948,7 +948,7 @@ private fun Footer(baseUrl: String, connection: ConnectionState, onRetry: () -> 
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "ContinuumSync 2.0.0 · ${hostLabel(baseUrl)}",
+            "ContinuumSync 2.0.1 · ${hostLabel(baseUrl)}",
             style = MaterialTheme.typography.bodyMedium,
             color = TextLow,
             textAlign = TextAlign.Center

@@ -12,8 +12,32 @@ android {
         applicationId = "dev.continuumsync.bridge"
         minSdk = 28
         targetSdk = 35
-        versionCode = 2
-        versionName = "2.0.0"
+        versionCode = 3
+        versionName = "2.0.1"
+    }
+
+    signingConfigs {
+        create("continuum") {
+            storeFile = rootProject.file("keystore/continuum-debug.keystore")
+            storePassword = "continuum"
+            keyAlias = "continuumdebug"
+            keyPassword = "continuum"
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("continuum")
+        }
+        release {
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("continuum")
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
     }
 
     buildFeatures {

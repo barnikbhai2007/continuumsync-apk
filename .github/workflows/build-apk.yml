@@ -26,17 +26,17 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Build debug APK
-        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Build release APK
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - name: Show APK details
         run: |
-          ls -lh app/build/outputs/apk/debug/
-          sha256sum app/build/outputs/apk/debug/app-debug.apk
+          ls -lh app/build/outputs/apk/release/
+          sha256sum app/build/outputs/apk/release/app-release.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ContinuumSync-Android-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/release/app-release.apk
           retention-days: 14

@@ -154,12 +154,8 @@ class SyncForegroundService : Service() {
                 handledCallKey = key
                 callController.answerCall()
             }
-            call.status == "rejected" &&
-                call.actionTakenBy != null && call.actionTakenBy != myRole -> {
-                handledCallKey = key
-                callController.endCall()
-            }
-            call.status == "rejected" && call.actionTakenBy == myRole -> {
+            (call.status == "rejected" || call.status == "ended") &&
+                call.actionTakenBy != null -> {
                 handledCallKey = key
                 callController.endCall()
             }
