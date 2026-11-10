@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>ContinuumSync — Android APK</title>
+<style>
+  :root {
+    --bg: #060a12;
+    --card: #101a2b;
+    --stroke: #1e2c44;
+    --text: #f2f6ff;
+    --mid: #a9b8d0;
+    --low: #7b8ca8;
+    --primary: #5b8cff;
+    --mint: #2bd9a8;
+    --amber: #ffb020;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background:
+      radial-gradient(900px 420px at 50% -120px, rgba(91, 140, 255, 0.28), transparent 70%),
+      var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 18px;
+  }
+  .wrap { width: 100%; max-width: 520px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
+  .logo {
+    width: 46px; height: 46px; border-radius: 14px;
+    background: linear-gradient(135deg, var(--primary), var(--mint));
+    display: grid; place-items: center;
+    box-shadow: 0 10px 30px rgba(91, 140, 255, 0.35);
+  }
+  .logo svg { width: 25px; height: 25px; }
+  h1 { font-size: 25px; margin: 0; letter-spacing: -0.4px; }
+  .sub { color: var(--low); font-size: 13px; margin-top: 3px; }
+  .card {
+    background: linear-gradient(180deg, rgba(16, 26, 43, 0.96), rgba(12, 21, 36, 0.96));
+    border: 1px solid var(--stroke);
+    border-radius: 24px;
+    padding: 22px;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+  }
+  .pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(43, 217, 168, 0.12);
+    border: 1px solid rgba(43, 217, 168, 0.3);
+    color: var(--mint);
+    border-radius: 999px;
+    padding: 6px 11px;
+    font-size: 11px; font-weight: 700; letter-spacing: 1.1px;
+    text-transform: uppercase;
+  }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--mint); }
+  h2 { font-size: 22px; margin: 16px 0 6px; letter-spacing: -0.3px; }
+  p { color: var(--mid); font-size: 14px; line-height: 1.55; margin: 0 0 18px; }
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    width: 100%; padding: 16px 18px;
+    background: var(--primary);
+    color: #07132c;
+    font-weight: 700; font-size: 15px;
+    text-decoration: none;
+    border-radius: 14px;
+    transition: filter 0.15s, transform 0.15s;
+  }
+  .btn:hover { filter: brightness(1.08); transform: translateY(-1px); }
+  .btn svg { width: 19px; height: 19px; }
+  .meta {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    margin-top: 14px;
+  }
+  .chip {
+    font-size: 11px; color: var(--low);
+    background: #0c1524; border: 1px solid var(--stroke);
+    border-radius: 999px; padding: 5px 10px;
+  }
+  .steps { margin: 22px 0 0; padding: 0; list-style: none; counter-reset: step; }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 0 0 16px 38px;
+    color: var(--mid); font-size: 13.5px; line-height: 1.5;
+  }
+  .steps li:last-child { padding-bottom: 0; }
+  .steps li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: -1px;
+    width: 25px; height: 25px; border-radius: 9px;
+    background: rgba(91, 140, 255, 0.14);
+    border: 1px solid rgba(91, 140, 255, 0.34);
+    color: var(--primary);
+    font-size: 11px; font-weight: 700;
+    display: grid; place-items: center;
+  }
+  .steps b { color: var(--text); font-weight: 600; }
+  .note {
+    margin-top: 18px; padding: 12px 14px;
+    border-radius: 12px;
+    background: rgba(255, 176, 32, 0.08);
+    border: 1px solid rgba(255, 176, 32, 0.24);
+    color: #e8c98b; font-size: 12.5px; line-height: 1.5;
+  }
+  footer {
+    text-align: center; color: var(--low); font-size: 12px;
+    margin-top: 20px;
+  }
+  footer a { color: var(--mid); }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand">
+      <div class="logo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#06122e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+        </svg>
+      </div>
+      <div>
+        <h1>ContinuumSync</h1>
+        <div class="sub">Two phones. One flow.</div>
+      </div>
+    </div>
+
+    <section class="card">
+      <span class="pill"><span class="dot"></span> Android build 2.0.0</span>
+      <h2>Install the bridge</h2>
+      <p>Mirror notifications, share the clipboard, and control calls across two Android phones in real time.</p>
+
+      <a class="btn" href="https://github.com/barnikbhai2007/continuumsync-apk/releases/latest/download/ContinuumSync-debug.apk">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download Android APK
+      </a>
+
+      <div class="meta">
+        <span class="chip">Android 9+</span>
+        <span class="chip">Debug signed</span>
+        <span class="chip">Built by GitHub Actions</span>
+      </div>
+
+      <ol class="steps">
+        <li><b>Install the APK</b> on both phones. Allow installs from your browser when Android asks.</li>
+        <li><b>Open Settings</b> in the app and enter the same sync server and room on both phones.</li>
+        <li><b>Pick Phone A on one phone and Phone B on the other.</b> The status pill turns <b>Linked</b> when they connect.</li>
+        <li><b>Grant notification listener and accessibility access</b> so alerts and clipboard can sync.</li>
+      </ol>
+
+      <div class="note">Both phones must reach the same sync server. On Wi-Fi, use your computer's LAN address (for example <b>http://192.168.1.20:3100</b>), not localhost.</div>
+    </section>
+
+    <footer>
+      Source and builds on <a href="https://github.com/barnikbhai2007/continuumsync-apk">GitHub</a> · <a href="https://github.com/barnikbhai2007/continuumsync-apk/releases/latest">All releases</a>
+    </footer>
+  </main>
+</body>
+</html>
