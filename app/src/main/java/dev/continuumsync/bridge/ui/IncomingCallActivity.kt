@@ -45,8 +45,8 @@ class IncomingCallActivity : ComponentActivity() {
         getSystemService(KeyguardManager::class.java)?.requestDismissKeyguard(this, null)
 
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.dark(Color.Transparent),
+            navigationBarStyle = SystemBarStyle.dark(Color.Transparent)
         )
 
         setContent {
