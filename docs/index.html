@@ -34,11 +34,9 @@
   .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 26px; }
   .logo {
     width: 46px; height: 46px; border-radius: 14px;
-    background: linear-gradient(135deg, var(--primary), var(--mint));
-    display: grid; place-items: center;
+    display: block; object-fit: cover;
     box-shadow: 0 10px 30px rgba(91, 140, 255, 0.35);
   }
-  .logo svg { width: 25px; height: 25px; }
   h1 { font-size: 25px; margin: 0; letter-spacing: -0.4px; }
   .sub { color: var(--low); font-size: 13px; margin-top: 3px; }
   .card {
@@ -118,12 +116,7 @@
 <body>
   <main class="wrap">
     <div class="brand">
-      <div class="logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="#06122e" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
-          <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
-        </svg>
-      </div>
+      <img class="logo" src="logo.png" alt="ContinuumSync logo" />
       <div>
         <h1>ContinuumSync</h1>
         <div class="sub">Two phones. One flow.</div>
@@ -131,9 +124,9 @@
     </div>
 
     <section class="card">
-      <span class="pill"><span class="dot"></span> Android build 2.0.1</span>
+      <span class="pill"><span class="dot"></span> Android build 2.1.0</span>
       <h2>Install the bridge</h2>
-      <p>Mirror notifications, share the clipboard, and control calls across two Android phones in real time.</p>
+      <p>Mirror notifications, share the clipboard, and control calls across two Android phones in real time. One phone hosts the room itself — no PC or web server needed.</p>
 
       <a class="btn" href="https://github.com/barnikbhai2007/continuumsync-apk/releases/latest/download/ContinuumSync-debug.apk">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -147,17 +140,18 @@
       <div class="meta">
         <span class="chip">Android 9+</span>
         <span class="chip">2 MB</span>
+        <span class="chip">No PC needed</span>
         <span class="chip">Built by GitHub Actions</span>
       </div>
 
       <ol class="steps">
-        <li><b>Uninstall any older ContinuumSync build</b>, then install the APK on both phones. Allow installs from your browser when Android asks.</li>
-        <li><b>Open Settings</b> in the app and enter the same sync server and room on both phones.</li>
-        <li><b>Pick Phone A on one phone and Phone B on the other.</b> The status pill turns <b>Linked</b> when they connect.</li>
-        <li><b>Grant notification listener and accessibility access</b> so alerts and clipboard can sync.</li>
+        <li><b>Install the APK on both phones</b> and connect both to the same Wi-Fi. Allow installs from your browser when Android asks.</li>
+        <li><b>Leave Phone A as the host.</b> It opens the room automatically and shows a host address on the dashboard.</li>
+        <li><b>On the other phone tap Switch to Phone B.</b> It finds Phone A over Wi-Fi. If not, tap Scan or enter the address in Settings.</li>
+        <li><b>Grant notification listener and accessibility access</b> so alerts and clipboard can sync. The pill turns <b>Linked</b> when both phones connect.</li>
       </ol>
 
-      <div class="note">Both phones must reach the same sync server. On Wi-Fi, use your computer's LAN address (for example <b>http://192.168.1.20:3100</b>), not localhost.</div>
+      <div class="note">Both phones must be on the same Wi-Fi network and Phone A must stay open. Guest or isolated Wi-Fi networks block phone-to-phone traffic — use your normal network or a hotspot instead.</div>
     </section>
 
     <footer>
