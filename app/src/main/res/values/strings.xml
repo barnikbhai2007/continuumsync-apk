@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ContinuumSync</string>
+    <string name="accessibility_service_description">Keeps the shared clipboard in sync between your two paired phones. ContinuumSync only reads text you copy and applies text copied on the other phone.</string>
+</resources>

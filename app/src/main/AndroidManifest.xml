@@ -27,6 +27,9 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
+    <!-- Clipboard focus overlay (Android 10+ background clipboard access) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <application
         android:name=".ContinuumApplication"
         android:allowBackup="false"
@@ -45,6 +48,27 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Full-screen incoming call UI on the phone that does not own the SIM -->
+        <activity
+            android:name=".ui.IncomingCallActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.ContinuumSync" />
+
+        <!-- Answer / Decline / End from the call notification -->
+        <receiver
+            android:name=".calls.CallActionReceiver"
+            android:exported="false" />
+
+        <!-- Dismiss a mirrored notification on both phones -->
+        <receiver
+            android:name=".notifications.MirrorDismissReceiver"
+            android:exported="false" />
 
         <!-- Persistent real-time connection to the sync room -->
         <service

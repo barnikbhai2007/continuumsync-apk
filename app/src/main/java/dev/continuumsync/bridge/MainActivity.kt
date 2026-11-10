@@ -12,6 +12,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import dev.continuumsync.bridge.clipboard.ClipboardBridge
 import dev.continuumsync.bridge.data.SyncRepository
 import dev.continuumsync.bridge.service.SyncForegroundService
 import dev.continuumsync.bridge.ui.ContinuumApp
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         SyncRepository.init(applicationContext)
+        ClipboardBridge.init(applicationContext)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
@@ -42,9 +44,21 @@ class MainActivity : ComponentActivity() {
         requestMissingPermissions()
     }
 
+    override fun onResume() {
+        super.onResume()
+        ClipboardBridge.setAppVisible(true)
+    }
+
+    override fun onPause() {
+        ClipboardBridge.setAppVisible(false)
+        super.onPause()
+    }
+
     private fun requestMissingPermissions() {
         val permissions = mutableListOf(
             Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.READ_CONTACTS,
             Manifest.permission.ANSWER_PHONE_CALLS
         )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

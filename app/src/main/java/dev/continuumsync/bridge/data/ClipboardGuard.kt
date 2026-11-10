@@ -28,6 +28,22 @@ object ClipboardGuard {
             .joinToString("") { "%02x".format(it) }
 }
 
+/**
+ * Optional direct clipboard writer exposed by the accessibility service. Some
+ * ROMs allow this in the background; ClipboardBridge verifies the write and
+ * falls back to its focus overlay when the platform ignores it.
+ */
+object ClipboardApplier {
+    @Volatile
+    var apply: ((String) -> Boolean)? = null
+}
+
+/** Optional direct clipboard reader exposed by the accessibility service. */
+object ClipboardReader {
+    @Volatile
+    var read: (() -> String?)? = null
+}
+
 object MainThread {
     private val handler = Handler(Looper.getMainLooper())
     fun post(block: () -> Unit) {

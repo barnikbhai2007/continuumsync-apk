@@ -69,6 +69,7 @@ class SyncNotificationListenerService : NotificationListenerService() {
             .put("id", "${sbn.key}@${sbn.postTime}")
             .put("originDevice", SyncRepository.prefs.role)
             .put("appName", appLabel(sbn.packageName))
+            .put("appPackage", sbn.packageName)
             .put("title", title)
             .put("content", text)
 

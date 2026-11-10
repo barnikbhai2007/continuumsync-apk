@@ -4,6 +4,7 @@ data class SyncNotification(
     val id: String,
     val originDevice: String,
     val appName: String,
+    val appPackage: String = "",
     val title: String,
     val content: String,
     val timestamp: String,
@@ -28,7 +29,8 @@ data class CallSnapshot(
 ) {
     val isRinging: Boolean get() = status == "ringing"
     val isActive: Boolean get() = status.startsWith("active")
-    val isFinished: Boolean get() = status == "rejected" || status == "ended"
+    val isFinished: Boolean get() =
+        status == "rejected" || status == "ended" || status == "missed"
 }
 
 data class RoomSnapshot(

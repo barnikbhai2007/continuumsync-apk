@@ -1,9 +1,8 @@
 package dev.continuumsync.bridge.data
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.util.Log
+import dev.continuumsync.bridge.clipboard.ClipboardBridge
 import dev.continuumsync.bridge.host.EmbeddedSyncServer
 import dev.continuumsync.bridge.host.HostDiscovery
 import kotlinx.coroutines.CancellationException
@@ -233,6 +232,7 @@ object SyncRepository {
                             id = item.optString("id"),
                             originDevice = item.optString("originDevice", ROLE_A),
                             appName = item.optString("appName", "Notification"),
+                            appPackage = item.optString("appPackage"),
                             title = item.optString("title"),
                             content = item.optString("content"),
                             timestamp = item.optString("timestamp"),
@@ -285,16 +285,7 @@ object SyncRepository {
         if (clipboard.text == lastAppliedClip) return
 
         lastAppliedClip = clipboard.text
-        ClipboardGuard.mark(clipboard.text)
-        MainThread.post {
-            try {
-                val manager =
-                    appContext.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                manager.setPrimaryClip(ClipData.newPlainText("ContinuumSync", clipboard.text))
-            } catch (error: Exception) {
-                Log.w(TAG, "clipboard write failed: ${error.message}")
-            }
-        }
+        ClipboardBridge.applyRemote(appContext, clipboard.text)
     }
 
     private suspend fun postBaseUrl(room: String): String {

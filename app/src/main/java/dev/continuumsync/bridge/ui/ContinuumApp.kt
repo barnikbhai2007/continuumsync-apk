@@ -104,6 +104,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import dev.continuumsync.bridge.R
+import dev.continuumsync.bridge.calls.CallSyncController
 import dev.continuumsync.bridge.data.CallSnapshot
 import dev.continuumsync.bridge.data.ClipboardSnapshot
 import dev.continuumsync.bridge.data.ConnectionState
@@ -145,6 +146,7 @@ fun ContinuumApp() {
     var role by remember { mutableStateOf(prefs.role) }
     var showSettings by remember { mutableStateOf(false) }
     var permissionTick by remember { mutableIntStateOf(0) }
+    var minimizedCallId by remember { mutableStateOf("") }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -160,6 +162,7 @@ fun ContinuumApp() {
 
     val notificationsGranted = remember(permissionTick) { hasNotificationAccess(context) }
     val accessibilityGranted = remember(permissionTick) { hasAccessibilityAccess(context) }
+    val overlayGranted = remember(permissionTick) { Settings.canDrawOverlays(context) }
     val callPermissions = remember { requiredCallPermissions() }
     val callsGranted = remember(permissionTick) { hasPermissions(context, callPermissions) }
 
@@ -205,8 +208,7 @@ fun ContinuumApp() {
             ) {
                 item {
                     PairingCard(
-                        room = room,
-                        role = role,
+                        room = room,                        role = role,
                         baseUrl = baseUrl,
                         connection = connection,
                         peers = peers,
@@ -234,6 +236,14 @@ fun ContinuumApp() {
                         },
                         onEdit = { showSettings = true }
                     )
+                }
+
+                if (!overlayGranted) {
+                    item {
+                        ClipboardSetupBanner(
+                            onGrant = { openOverlaySettings(context) }
+                        )
+                    }
                 }
 
                 item {
@@ -264,15 +274,29 @@ fun ContinuumApp() {
                             call = activeCall,
                             myRole = role,
                             onAnswer = {
-                                val status = if (activeCall.originDevice == role) {
-                                    "active-on-origin"
+                                minimizedCallId = activeCall.callId
+                                if (activeCall.originDevice == role) {
+                                    CallSyncController(context.applicationContext).answerCall()
+                                    SyncRepository.respondToCall(activeCall, "active-on-origin")
                                 } else {
-                                    "active-bthfp-routed"
+                                    SyncRepository.respondToCall(activeCall, "answer-requested")
                                 }
-                                SyncRepository.respondToCall(activeCall, status)
                             },
-                            onReject = { SyncRepository.respondToCall(activeCall, "rejected") },
-                            onEnd = { SyncRepository.respondToCall(activeCall, "ended") }
+                            onReject = {
+                                minimizedCallId = activeCall.callId
+                                if (activeCall.originDevice == role) {
+                                    CallSyncController(context.applicationContext)
+                                        .endCall(reject = true)
+                                }
+                                SyncRepository.respondToCall(activeCall, "rejected")
+                            },
+                            onEnd = {
+                                minimizedCallId = activeCall.callId
+                                if (activeCall.originDevice == role) {
+                                    CallSyncController(context.applicationContext).endCall()
+                                }
+                                SyncRepository.respondToCall(activeCall, "ended")
+                            }
                         )
                     }
                 }
@@ -318,9 +342,11 @@ fun ContinuumApp() {
                     PermissionsCard(
                         notificationsGranted = notificationsGranted,
                         accessibilityGranted = accessibilityGranted,
+                        overlayGranted = overlayGranted,
                         callsGranted = callsGranted,
                         onOpenNotifications = { openNotificationSettings(context) },
                         onOpenAccessibility = { openAccessibilitySettings(context) },
+                        onOpenOverlay = { openOverlaySettings(context) },
                         onRequestCalls = { permissionLauncher.launch(callPermissions) }
                     )
                 }
@@ -336,6 +362,41 @@ fun ContinuumApp() {
                     )
                 }
             }
+        }
+
+        val ringingCall = activeCall?.takeIf {
+            it.isRinging && it.callId != minimizedCallId
+        }
+        if (ringingCall != null) {
+            CallScreen(
+                call = ringingCall,
+                myRole = role,
+                onAnswer = {
+                    minimizedCallId = ringingCall.callId
+                    if (ringingCall.originDevice == role) {
+                        CallSyncController(context.applicationContext).answerCall()
+                        SyncRepository.respondToCall(ringingCall, "active-on-origin")
+                    } else {
+                        SyncRepository.respondToCall(ringingCall, "answer-requested")
+                    }
+                },
+                onDecline = {
+                    minimizedCallId = ringingCall.callId
+                    if (ringingCall.originDevice == role) {
+                        CallSyncController(context.applicationContext)
+                            .endCall(reject = true)
+                    }
+                    SyncRepository.respondToCall(ringingCall, "rejected")
+                },
+                onEnd = {
+                    minimizedCallId = ringingCall.callId
+                    if (ringingCall.originDevice == role) {
+                        CallSyncController(context.applicationContext).endCall()
+                    }
+                    SyncRepository.respondToCall(ringingCall, "ended")
+                },
+                onClose = { minimizedCallId = ringingCall.callId }
+            )
         }
     }
 
@@ -743,14 +804,23 @@ private fun CallCard(
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
                 Text(
-                    if (call.isRinging) "INCOMING CALL" else "CALL IN PROGRESS",
+                    when {
+                        call.isRinging -> "INCOMING CALL"
+                        call.status == "answer-requested" -> "ANSWERING"
+                        call.isActive -> "CALL IN PROGRESS"
+                        else -> "CALL"
+                    },
                     style = MaterialTheme.typography.labelSmall,
-                    color = Danger
+                    color = if (call.isRinging) Mint else Danger
                 )
                 Spacer(Modifier.height(2.dp))
-                Text(call.callerName, style = MaterialTheme.typography.titleLarge, color = TextHi)
+                Text(
+                    call.callerName.ifBlank { "Unknown caller" },
+                    style = MaterialTheme.typography.titleLarge,
+                    color = TextHi
+                )
             }
-            Pill(call.status.replace('-', ' '), Danger)
+            Pill(call.status.replace('-', ' '), if (call.isRinging) Mint else Danger)
         }
         if (call.callerNumber.isNotBlank()) {
             Spacer(Modifier.height(8.dp))
@@ -796,8 +866,11 @@ private fun CallCard(
         }
         Spacer(Modifier.height(10.dp))
         Text(
-            "Control is relayed to ${roleLabel(call.originDevice)}." +
-                if (call.originDevice == myRole) " This phone owns the call." else "",
+            if (call.originDevice == myRole) {
+                "This phone owns the SIM. Answer here or from the other phone."
+            } else {
+                "Answering picks up the real call on ${roleLabel(call.originDevice)}."
+            },
             style = MaterialTheme.typography.bodyMedium,
             color = TextLow
         )
@@ -1004,24 +1077,31 @@ private fun NotificationCard(
 private fun PermissionsCard(
     notificationsGranted: Boolean,
     accessibilityGranted: Boolean,
+    overlayGranted: Boolean,
     callsGranted: Boolean,
     onOpenNotifications: () -> Unit,
     onOpenAccessibility: () -> Unit,
+    onOpenOverlay: () -> Unit,
     onRequestCalls: () -> Unit
 ) {
-    val granted = listOf(notificationsGranted, accessibilityGranted, callsGranted).count { it }
+    val granted = listOf(
+        notificationsGranted,
+        accessibilityGranted,
+        overlayGranted,
+        callsGranted
+    ).count { it }
     SectionCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text("Device access", style = MaterialTheme.typography.titleMedium, color = TextHi)
             Spacer(Modifier.weight(1f))
             Pill(
-                text = "$granted/3",
-                color = if (granted == 3) Mint else Amber
+                text = "$granted/4",
+                color = if (granted == 4) Mint else Amber
             )
         }
         Spacer(Modifier.height(6.dp))
         Text(
-            "Three non-root permissions power the bridge. Tap a row to manage it.",
+            "Four non-root permissions power the bridge. Tap a row to manage it.",
             style = MaterialTheme.typography.bodyMedium,
             color = TextLow
         )
@@ -1035,9 +1115,17 @@ private fun PermissionsCard(
         )
         HorizontalDivider(color = Stroke, modifier = Modifier.padding(vertical = 10.dp))
         PermissionRow(
+            icon = Icons.Rounded.ContentCopy,
+            title = "Clipboard auto-sync",
+            subtitle = "Display over other apps · instant copy",
+            granted = overlayGranted,
+            onClick = onOpenOverlay
+        )
+        HorizontalDivider(color = Stroke, modifier = Modifier.padding(vertical = 10.dp))
+        PermissionRow(
             icon = Icons.Rounded.Accessibility,
-            title = "Clipboard capture",
-            subtitle = "Detect copies via Accessibility",
+            title = "Clipboard backup",
+            subtitle = "Optional accessibility helper",
             granted = accessibilityGranted,
             onClick = onOpenAccessibility
         )
@@ -1045,10 +1133,62 @@ private fun PermissionsCard(
         PermissionRow(
             icon = Icons.Rounded.Phone,
             title = "Call control",
-            subtitle = "Answer and reject calls",
+            subtitle = "Show who is calling · answer & decline",
             granted = callsGranted,
             onClick = onRequestCalls
         )
+    }
+}
+
+@Composable
+private fun ClipboardSetupBanner(onGrant: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(18.dp))
+            .background(Brush.linearGradient(listOf(Color(0xFF2A2312), Card)))
+            .border(1.dp, Amber.copy(alpha = 0.45f), RoundedCornerShape(18.dp))
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            Modifier
+                .size(38.dp)
+                .clip(CircleShape)
+                .background(Amber.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Rounded.ContentCopy,
+                contentDescription = null,
+                tint = Amber
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                "Turn on instant clipboard",
+                style = MaterialTheme.typography.titleMedium,
+                color = TextHi
+            )
+            Spacer(Modifier.height(2.dp))
+            Text(
+                "Allow \"Display over other apps\" so copies sync while you are in any app.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = TextMid
+            )
+        }
+        Spacer(Modifier.width(10.dp))
+        Button(
+            onClick = onGrant,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Amber,
+                contentColor = Color(0xFF231704)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("Allow")
+        }
     }
 }
 
@@ -1116,7 +1256,7 @@ private fun Footer(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            "ContinuumSync 2.1.0 · $endpoint",
+            "ContinuumSync 2.1.1 · $endpoint",
             style = MaterialTheme.typography.bodyMedium,
             color = TextLow,
             textAlign = TextAlign.Center
@@ -1398,6 +1538,8 @@ private fun hasAccessibilityAccess(context: Context): Boolean {
 private fun requiredCallPermissions(): Array<String> {
     val permissions = mutableListOf(
         Manifest.permission.READ_PHONE_STATE,
+        Manifest.permission.READ_CALL_LOG,
+        Manifest.permission.READ_CONTACTS,
         Manifest.permission.ANSWER_PHONE_CALLS
     )
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1426,4 +1568,20 @@ private fun openAccessibilitySettings(context: Context) {
     val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
     context.startActivity(intent)
+}
+
+private fun openOverlaySettings(context: Context) {
+    try {
+        val intent = Intent(
+            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+            Uri.parse("package:${context.packageName}")
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        val fallback = Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.parse("package:${context.packageName}")
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        context.startActivity(fallback)
+    }
 }

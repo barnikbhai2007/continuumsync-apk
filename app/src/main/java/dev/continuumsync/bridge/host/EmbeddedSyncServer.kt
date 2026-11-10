@@ -328,6 +328,7 @@ object EmbeddedSyncServer {
                                     id = id,
                                     originDevice = normalizeDevice(payload.optString("originDevice")) ?: ROLE_A,
                                     appName = payload.optString("appName").ifBlank { "Notification" },
+                                    appPackage = payload.optString("appPackage"),
                                     title = title,
                                     content = payload.optString("content"),
                                     timestamp = updatedAt,
@@ -464,6 +465,7 @@ object EmbeddedSyncServer {
                 .put("id", item.id)
                 .put("originDevice", item.originDevice)
                 .put("appName", item.appName)
+                .put("appPackage", item.appPackage)
                 .put("title", item.title)
                 .put("content", item.content)
                 .put("timestamp", item.timestamp)
