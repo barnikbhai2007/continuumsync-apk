@@ -8,9 +8,10 @@ A native two-phone bridge for [ContinuumSync](https://github.com/barnikbhai2007/
 
 The APK is built automatically by GitHub Actions on every push to `main`. From 2.0.1 onward it is signed with a stable project key, so newer builds install over the previous one. Android will ask you to allow installs from your browser or file manager.
 
+- Current: 2.1.1 (versionCode 5)
 - Minimum: Android 9 (API 28)
 - Target: Android 15 (API 35)
-- Size: about 2 MB
+- Size: about 2.4 MB
 
 ## What the app does
 
@@ -18,9 +19,9 @@ The APK is built automatically by GitHub Actions on every push to `main`. From 2
 - **Automatic discovery** — Phone B finds Phone A on the local network by itself. You can also type the host address manually.
 - **Pairing room** — both phones use the same room (default `482-910`). One phone is Phone A (host), the other Phone B (join).
 - **Live connection status** — the dashboard shows when the peer phone is actually linked, not just whether this phone has permissions.
-- **Notification mirroring** — notifications from the other phone appear in a live feed and as Android notifications. Dismissing one clears it on both phones.
-- **Shared clipboard** — copy on either phone and the text appears on the other. A Quick Settings tile pushes the clipboard manually.
-- **Call controls** — incoming calls show up with Answer, Reject, and End actions that are relayed to the phone that owns the call.
+- **Notification mirroring** — notifications from the other phone appear in a live feed and as Android notifications, with the source app icon. Dismissing one clears it on both phones.
+- **Shared clipboard** — copy on either phone and the text appears on the other within a second. Works in the background on Android 10+ through a brief focus overlay ("Display over other apps").
+- **Incoming calls** — the phone without the SIM rings full-screen with the caller's name and number, plus working Answer and Decline buttons that control the real call on the SIM phone.
 - **Foreground service** — the bridge keeps running when the app is in the background, with a persistent status notification.
 
 ## Set it up
@@ -28,13 +29,16 @@ The APK is built automatically by GitHub Actions on every push to `main`. From 2
 1. Install the APK on both phones and connect both to the same Wi-Fi network.
 2. Open the app on **Phone A** and leave it on the default role. Phone A hosts the room automatically and shows a host address such as `http://192.168.1.23:3100`.
 3. On **Phone B**, tap **Switch to Phone B**. It finds Phone A automatically over Wi-Fi. If it does not, tap **Scan** or enter the host address in **Settings**.
-4. Grant the three device-access permissions on both phones:
+4. Grant the device-access permissions on both phones:
    - Notification listener access (mirror and dismiss alerts)
-   - Accessibility service (clipboard capture)
-   - Phone and Bluetooth permissions (call control)
+   - Phone, call log, and contact permissions (caller name and call control)
+   - **Display over other apps** (instant clipboard sync on Android 10+)
+   - Accessibility service (optional clipboard backup)
 5. The status pill turns **Linked** when both phones are connected. Use **Test alert**, **Clipboard**, and **Test call** to verify the bridge.
 
 > Both phones must be on the same Wi-Fi network, and Phone A must be open or running its foreground service. Networks that isolate clients (guest Wi-Fi, some routers) block phone-to-phone traffic; use the normal Wi-Fi network or a hotspot instead.
+
+> **Clipboard note:** Android 10+ blocks background clipboard access for every app, including accessibility services. ContinuumSync shows a 2×2 px focusable overlay for ~220 ms each time it reads or writes the clipboard, which requires the "Display over other apps" permission on both phones.
 
 ## Build from source
 

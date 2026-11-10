@@ -124,9 +124,9 @@
     </div>
 
     <section class="card">
-      <span class="pill"><span class="dot"></span> Android build 2.1.0</span>
+      <span class="pill"><span class="dot"></span> Android build 2.1.1</span>
       <h2>Install the bridge</h2>
-      <p>Mirror notifications, share the clipboard, and control calls across two Android phones in real time. One phone hosts the room itself — no PC or web server needed.</p>
+      <p>Mirror notifications, share the clipboard instantly, and answer real calls from either phone. One phone hosts the room itself — no PC or web server needed.</p>
 
       <a class="btn" href="https://github.com/barnikbhai2007/continuumsync-apk/releases/latest/download/ContinuumSync-debug.apk">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -139,8 +139,9 @@
 
       <div class="meta">
         <span class="chip">Android 9+</span>
-        <span class="chip">2 MB</span>
+        <span class="chip">2.4 MB</span>
         <span class="chip">No PC needed</span>
+        <span class="chip">Instant clipboard</span>
         <span class="chip">Built by GitHub Actions</span>
       </div>
 
@@ -148,7 +149,9 @@
         <li><b>Install the APK on both phones</b> and connect both to the same Wi-Fi. Allow installs from your browser when Android asks.</li>
         <li><b>Leave Phone A as the host.</b> It opens the room automatically and shows a host address on the dashboard.</li>
         <li><b>On the other phone tap Switch to Phone B.</b> It finds Phone A over Wi-Fi. If not, tap Scan or enter the address in Settings.</li>
-        <li><b>Grant notification listener and accessibility access</b> so alerts and clipboard can sync. The pill turns <b>Linked</b> when both phones connect.</li>
+        <li><b>Grant notification listener, phone, and contact access</b> so alerts and caller names appear on the other phone. Accessibility is optional (clipboard backup only).</li>
+        <li><b>Allow “Display over other apps”</b> on both phones. This is what makes clipboard sync work instantly while you are in any app on Android 10+.</li>
+        <li><b>Wait for the Linked pill.</b> Then copy text on either phone, or take a call — the other phone shows it with Answer and Decline.</li>
       </ol>
 
       <div class="note">Both phones must be on the same Wi-Fi network and Phone A must stay open. Guest or isolated Wi-Fi networks block phone-to-phone traffic — use your normal network or a hotspot instead.</div>
