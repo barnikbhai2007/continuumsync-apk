@@ -67,16 +67,12 @@ object ClipboardBridge {
     private val poller = object : Runnable {
         override fun run() {
             if (!started) return
-            // Reading the clipboard in the background needs a focusable
-            // overlay. Doing that while an input method is open steals focus
-            // from the text field and makes the keyboard flicker, so wait for
-            // the keyboard to close and check again shortly.
-            if (isImeVisible()) {
-                handler.postDelayed(this, IME_POLL_MS)
-                return
-            }
             captureClipboard()
-            handler.postDelayed(this, FALLBACK_POLL_MS)
+            // While an input method is open, captureClipboard only uses the
+            // direct/accessibility read and never the focus overlay. Check
+            // more often so sync resumes as soon as the keyboard closes.
+            val delay = if (isImeVisible()) IME_POLL_MS else FALLBACK_POLL_MS
+            handler.postDelayed(this, delay)
         }
     }
 
