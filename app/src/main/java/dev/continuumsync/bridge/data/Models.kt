@@ -9,7 +9,9 @@ data class SyncNotification(
     val content: String,
     val timestamp: String,
     val dismissed: Boolean,
-    val repliedText: String? = null
+    val repliedText: String? = null,
+    val repliedBy: String? = null,
+    val canReply: Boolean = false
 )
 
 data class ClipboardSnapshot(
@@ -33,13 +35,30 @@ data class CallSnapshot(
         status == "rejected" || status == "ended" || status == "missed"
 }
 
+data class PeerDevice(
+    val role: String = ROLE_A,
+    val name: String = "",
+    val model: String = "",
+    val online: Boolean = true
+) {
+    val label: String
+        get() = name.ifBlank {
+            when {
+                model.isNotBlank() -> model
+                role == ROLE_B -> "Phone B"
+                else -> "Phone A"
+            }
+        }
+}
+
 data class RoomSnapshot(
     val room: String = "",
     val updatedAt: String = "",
     val connectedPeers: Int = 0,
     val clipboard: ClipboardSnapshot = ClipboardSnapshot(),
     val activeCall: CallSnapshot = CallSnapshot(),
-    val notifications: List<SyncNotification> = emptyList()
+    val notifications: List<SyncNotification> = emptyList(),
+    val peers: List<PeerDevice> = emptyList()
 )
 
 enum class ConnectionState { IDLE, CONNECTING, CONNECTED, OFFLINE }

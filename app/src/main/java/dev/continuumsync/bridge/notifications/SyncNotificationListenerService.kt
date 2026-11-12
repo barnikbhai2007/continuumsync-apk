@@ -19,21 +19,42 @@ class SyncNotificationListenerService : NotificationListenerService() {
     private val replyActionsCache = ConcurrentHashMap<String, Notification.Action>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val handledRemoteDismissals = mutableSetOf<String>()
+    private val handledRemoteReplies = mutableSetOf<String>()
 
     override fun onCreate() {
         super.onCreate()
+        activeInstance = this
         scope.launch {
             SyncRepository.snapshot.collect { snapshot ->
                 if (snapshot == null) return@collect
                 val myRole = SyncRepository.prefs.role
                 for (item in snapshot.notifications) {
-                    if (!item.dismissed || item.originDevice != myRole) continue
-                    if (!handledRemoteDismissals.add(item.id)) continue
-                    val sbnKey = item.id.substringBeforeLast("@")
-                    if (sbnKey.isNotBlank()) {
-                        try {
-                            cancelNotification(sbnKey)
-                        } catch (_: Exception) {
+                    if (item.originDevice != myRole) continue
+
+                    if (item.dismissed) {
+                        if (!handledRemoteDismissals.add(item.id)) continue
+                        val sbnKey = item.id.substringBeforeLast("@")
+                        if (sbnKey.isNotBlank()) {
+                            try {
+                                cancelNotification(sbnKey)
+                            } catch (_: Exception) {
+                            }
+                        }
+                        continue
+                    }
+
+                    val reply = item.repliedText
+                    val replyBy = item.repliedBy
+                    if (!reply.isNullOrBlank() && !replyBy.isNullOrBlank() && replyBy != myRole) {
+                        val token = "${item.id}|$replyBy|$reply"
+                        if (handledRemoteReplies.add(token)) {
+                            val sbnKey = item.id.substringBeforeLast("@")
+                            if (sbnKey.isNotBlank()) {
+                                try {
+                                    handleRemoteInlineReply(sbnKey, reply)
+                                } catch (_: Exception) {
+                                }
+                            }
                         }
                     }
                 }
@@ -42,6 +63,7 @@ class SyncNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onDestroy() {
+        if (activeInstance === this) activeInstance = null
         scope.cancel()
         super.onDestroy()
     }
@@ -72,6 +94,7 @@ class SyncNotificationListenerService : NotificationListenerService() {
             .put("appPackage", sbn.packageName)
             .put("title", title)
             .put("content", text)
+            .put("canReply", replyAction != null)
 
         SyncRepository.postEventAsync("NOTIFICATION_POST", payload)
     }
@@ -105,5 +128,18 @@ class SyncNotificationListenerService : NotificationListenerService() {
         }
         android.app.RemoteInput.addResultsToIntent(remoteInputs, fillInIntent, resultsBundle)
         action.actionIntent.send(applicationContext, 0, fillInIntent)
+    }
+
+    companion object {
+        @Volatile
+        private var activeInstance: SyncNotificationListenerService? = null
+
+        fun sendReplyFromThisDevice(sbnKey: String, replyText: String) {
+            activeInstance?.handleRemoteInlineReply(sbnKey, replyText)
+        }
+
+        fun dismissFromThisDevice(sbnKey: String) {
+            activeInstance?.handleRemoteDismissCommand(sbnKey)
+        }
     }
 }

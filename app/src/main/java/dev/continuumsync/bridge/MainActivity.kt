@@ -13,6 +13,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import dev.continuumsync.bridge.clipboard.ClipboardBridge
+import dev.continuumsync.bridge.data.DeviceIdentity
 import dev.continuumsync.bridge.data.SyncRepository
 import dev.continuumsync.bridge.service.SyncForegroundService
 import dev.continuumsync.bridge.ui.ContinuumApp
@@ -26,13 +27,15 @@ class MainActivity : ComponentActivity() {
         SyncRepository.init(applicationContext)
         ClipboardBridge.init(applicationContext)
         enableEdgeToEdge(
-            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
-            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT)
+            statusBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(Color.TRANSPARENT, Color.TRANSPARENT)
         )
+
+        val pairingLink = intent?.data?.toString()
 
         setContent {
             ContinuumTheme {
-                ContinuumApp()
+                ContinuumApp(initialPairingLink = pairingLink)
             }
         }
 
@@ -55,15 +58,18 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestMissingPermissions() {
-        val permissions = mutableListOf(
-            Manifest.permission.READ_PHONE_STATE,
-            Manifest.permission.READ_CALL_LOG,
-            Manifest.permission.READ_CONTACTS,
-            Manifest.permission.ANSWER_PHONE_CALLS
-        )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+        val permissions = mutableListOf<String>()
+
+        if (DeviceIdentity.hasTelephony(this)) {
+            permissions.add(Manifest.permission.READ_PHONE_STATE)
+            permissions.add(Manifest.permission.READ_CALL_LOG)
+            permissions.add(Manifest.permission.READ_CONTACTS)
+            permissions.add(Manifest.permission.ANSWER_PHONE_CALLS)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                permissions.add(Manifest.permission.BLUETOOTH_CONNECT)
+            }
         }
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
         }

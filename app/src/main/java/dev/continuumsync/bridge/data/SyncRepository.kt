@@ -5,6 +5,7 @@ import android.util.Log
 import dev.continuumsync.bridge.clipboard.ClipboardBridge
 import dev.continuumsync.bridge.host.EmbeddedSyncServer
 import dev.continuumsync.bridge.host.HostDiscovery
+import dev.continuumsync.bridge.notifications.SyncNotificationListenerService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -166,7 +167,9 @@ object SyncRepository {
             try {
                 val url = URL(
                     "$base/api/sync/stream?room=${URLEncoder.encode(room, "UTF-8")}" +
-                        "&device=${URLEncoder.encode(prefs.role, "UTF-8")}"
+                        "&device=${URLEncoder.encode(prefs.role, "UTF-8")}" +
+                        "&name=${URLEncoder.encode(DeviceIdentity.displayName, "UTF-8")}" +
+                        "&model=${URLEncoder.encode(DeviceIdentity.model, "UTF-8")}"
                 )
                 connection = (url.openConnection() as HttpURLConnection).apply {
                     requestMethod = "GET"
@@ -237,7 +240,27 @@ object SyncRepository {
                             content = item.optString("content"),
                             timestamp = item.optString("timestamp"),
                             dismissed = item.optBoolean("dismissed", false),
-                            repliedText = item.optString("repliedText").ifBlank { null }
+                            repliedText = item.optString("repliedText").ifBlank { null },
+                            repliedBy = item.optString("repliedBy").ifBlank { null },
+                            canReply = item.optBoolean("canReply", false)
+                        )
+                    )
+                }
+            }
+
+            val peers = mutableListOf<PeerDevice>()
+            val peersArray = root.optJSONArray("peers")
+            if (peersArray != null) {
+                for (index in 0 until peersArray.length()) {
+                    val item = peersArray.optJSONObject(index) ?: continue
+                    val peerRoleValue = item.optString("role")
+                    if (peerRoleValue.isBlank()) continue
+                    peers.add(
+                        PeerDevice(
+                            role = peerRoleValue,
+                            name = item.optString("name"),
+                            model = item.optString("model"),
+                            online = item.optBoolean("online", true)
                         )
                     )
                 }
@@ -268,7 +291,8 @@ object SyncRepository {
                 connectedPeers = root.optInt("connectedPeers", 0),
                 clipboard = clipboard,
                 activeCall = call,
-                notifications = notifications
+                notifications = notifications,
+                peers = peers
             )
 
             _snapshot.value = parsed
@@ -348,6 +372,32 @@ object SyncRepository {
     fun dismissNotification(id: String) {
         if (id.isBlank()) return
         postEventAsync("NOTIFICATION_DISMISS", JSONObject().put("id", id))
+    }
+
+    fun dismissNotification(item: SyncNotification) {
+        if (item.originDevice == prefs.role) {
+            val sbnKey = item.id.substringBeforeLast("@")
+            if (sbnKey.isNotBlank()) {
+                SyncNotificationListenerService.dismissFromThisDevice(sbnKey)
+            }
+        }
+        dismissNotification(item.id)
+    }
+
+    fun replyToNotification(item: SyncNotification, replyText: String) {
+        val text = replyText.trim()
+        if (text.isBlank()) return
+        if (item.originDevice == prefs.role) {
+            val sbnKey = item.id.substringBeforeLast("@")
+            if (sbnKey.isNotBlank()) {
+                SyncNotificationListenerService.sendReplyFromThisDevice(sbnKey, text)
+            }
+        }
+        val payload = JSONObject()
+            .put("id", item.id)
+            .put("replyText", text)
+            .put("replyBy", prefs.role)
+        postEventAsync("NOTIFICATION_REPLY", payload)
     }
 
     fun sendTestAlert() {

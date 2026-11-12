@@ -12,8 +12,8 @@ android {
         applicationId = "dev.continuumsync.bridge"
         minSdk = 28
         targetSdk = 35
-        versionCode = 5
-        versionName = "2.1.1"
+        versionCode = 6
+        versionName = "2.2.0"
     }
 
     signingConfigs {
@@ -72,6 +72,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    // QR pairing: scanning uses the embedded ZXing capture activity, and the
+    // same ZXing core renders the QR code shown on the host device.
+    implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    implementation("com.google.zxing:core:3.5.3")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

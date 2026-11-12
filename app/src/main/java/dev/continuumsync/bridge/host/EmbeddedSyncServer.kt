@@ -30,6 +30,7 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
+import java.net.URLDecoder
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import kotlin.coroutines.coroutineContext
@@ -82,7 +83,9 @@ object EmbeddedSyncServer {
     private data class HostClient(
         val socket: Socket,
         val output: OutputStream,
-        val device: String?
+        val device: String?,
+        val name: String?,
+        val model: String?
     )
 
     fun init(context: Context) {
@@ -232,7 +235,13 @@ object EmbeddedSyncServer {
                 method == "GET" && path == "/api/sync/stream" -> {
                     keepOpen = true
                     val device = normalizeDevice(query["device"])
-                    registerStream(socket, output, device)
+                    registerStream(
+                        socket,
+                        output,
+                        device,
+                        query["name"]?.trim().orEmpty(),
+                        query["model"]?.trim().orEmpty()
+                    )
                 }
                 method == "POST" && path == "/api/sync/event" -> {
                     val length = headers["content-length"]?.toIntOrNull() ?: 0
@@ -258,8 +267,14 @@ object EmbeddedSyncServer {
         }
     }
 
-    private fun registerStream(socket: Socket, output: OutputStream, device: String?) {
-        val client = HostClient(socket, output, device)
+    private fun registerStream(
+        socket: Socket,
+        output: OutputStream,
+        device: String?,
+        name: String?,
+        model: String?
+    ) {
+        val client = HostClient(socket, output, device, name, model)
         synchronized(stateLock) { clients.add(client) }
 
         val headers = buildString {
@@ -332,7 +347,8 @@ object EmbeddedSyncServer {
                                     title = title,
                                     content = payload.optString("content"),
                                     timestamp = updatedAt,
-                                    dismissed = false
+                                    dismissed = false,
+                                    canReply = payload.optBoolean("canReply", false)
                                 )
                             )
                             trimNotifications()
@@ -354,7 +370,10 @@ object EmbeddedSyncServer {
                     if (id.isNotBlank() && reply.isNotBlank()) {
                         val index = notifications.indexOfFirst { it.id == id }
                         if (index >= 0) {
-                            notifications[index] = notifications[index].copy(repliedText = reply)
+                            notifications[index] = notifications[index].copy(
+                                repliedText = reply,
+                                repliedBy = normalizeDevice(payload.optString("replyBy"))
+                            )
                         }
                     }
                 }
@@ -470,10 +489,27 @@ object EmbeddedSyncServer {
                 .put("content", item.content)
                 .put("timestamp", item.timestamp)
                 .put("dismissed", item.dismissed)
+                .put("canReply", item.canReply)
             item.repliedText?.let { json.put("repliedText", it) }
+            item.repliedBy?.let { json.put("repliedBy", it) }
             array.put(json)
         }
         root.put("notifications", array)
+
+        val peersArray = JSONArray()
+        val seenRoles = mutableSetOf<String>()
+        for (client in clients) {
+            val device = client.device ?: continue
+            if (!seenRoles.add(device)) continue
+            peersArray.put(
+                JSONObject()
+                    .put("role", device)
+                    .put("name", client.name.orEmpty())
+                    .put("model", client.model.orEmpty())
+                    .put("online", true)
+            )
+        }
+        root.put("peers", peersArray)
         root.put("relayedCiphertexts", JSONArray())
         return root.toString()
     }
@@ -571,11 +607,20 @@ object EmbeddedSyncServer {
         val result = mutableMapOf<String, String>()
         for (part in raw.split('&')) {
             if (part.isBlank()) continue
-            val key = part.substringBefore('=').trim()
-            val value = part.substringAfter('=', "").trim()
-            if (key.isNotEmpty()) result[key] = value
+            val rawKey = part.substringBefore('=').trim()
+            val rawValue = part.substringAfter('=', "").trim()
+            if (rawKey.isNotEmpty()) {
+                val key = decodeQuery(rawKey)
+                result[key] = decodeQuery(rawValue)
+            }
         }
         return result
+    }
+
+    private fun decodeQuery(value: String): String = try {
+        URLDecoder.decode(value, "UTF-8")
+    } catch (_: Exception) {
+        value
     }
 
     private fun normalizeDevice(raw: String?): String? {

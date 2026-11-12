@@ -48,11 +48,11 @@ import androidx.compose.ui.unit.sp
 import dev.continuumsync.bridge.R
 import dev.continuumsync.bridge.data.CallSnapshot
 import dev.continuumsync.bridge.data.roleLabel
+import dev.continuumsync.bridge.ui.theme.CallTextHi
+import dev.continuumsync.bridge.ui.theme.CallTextLow
+import dev.continuumsync.bridge.ui.theme.CallTextMid
 import dev.continuumsync.bridge.ui.theme.Danger
 import dev.continuumsync.bridge.ui.theme.Mint
-import dev.continuumsync.bridge.ui.theme.TextHi
-import dev.continuumsync.bridge.ui.theme.TextLow
-import dev.continuumsync.bridge.ui.theme.TextMid
 
 @Composable
 fun CallScreen(
@@ -84,7 +84,7 @@ fun CallScreen(
     val accent = when {
         isRinging || isAnswering || isActive -> Mint
         call.status == "missed" -> Mint
-        else -> TextLow
+        else -> CallTextLow
     }
 
     Box(
@@ -139,19 +139,19 @@ fun CallScreen(
                 Text(
                     "ContinuumSync",
                     style = MaterialTheme.typography.titleMedium,
-                    color = TextHi
+                    color = CallTextHi
                 )
                 Spacer(Modifier.weight(1f))
                 Text(
                     if (isRemote) "from ${roleLabel(call.originDevice)}" else "on this phone",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = TextLow
+                    color = CallTextLow
                 )
                 IconButton(onClick = onClose) {
                     Icon(
                         Icons.Rounded.Close,
                         contentDescription = "Minimize call screen",
-                        tint = TextMid
+                        tint = CallTextMid
                     )
                 }
             }
@@ -180,7 +180,7 @@ fun CallScreen(
                 fontSize = 36.sp,
                 lineHeight = 41.sp,
                 fontWeight = FontWeight.Bold,
-                color = TextHi,
+                color = CallTextHi,
                 textAlign = TextAlign.Center,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
@@ -191,7 +191,7 @@ fun CallScreen(
                     call.callerNumber,
                     fontFamily = FontFamily.Monospace,
                     fontSize = 16.sp,
-                    color = TextMid,
+                    color = CallTextMid,
                     textAlign = TextAlign.Center
                 )
             }
@@ -212,7 +212,7 @@ fun CallScreen(
                     else -> "The call has ended"
                 },
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextLow,
+                color = CallTextLow,
                 textAlign = TextAlign.Center
             )
 
@@ -227,7 +227,7 @@ fun CallScreen(
                     Text(
                         "Answering picks up the call on ${roleLabel(call.originDevice)} and turns on its speaker.",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = TextMid,
+                        color = CallTextMid,
                         textAlign = TextAlign.Center
                     )
                 }
@@ -277,7 +277,7 @@ fun CallScreen(
             Text(
                 "ContinuumSync · peer-to-peer over your Wi-Fi",
                 style = MaterialTheme.typography.bodyMedium,
-                color = TextLow.copy(alpha = 0.75f)
+                color = CallTextLow.copy(alpha = 0.75f)
             )
         }
     }
@@ -362,7 +362,7 @@ private fun PulsingAvatar(name: String, ringing: Boolean, active: Boolean) {
                     initials,
                     fontSize = 44.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (ringing) Color(0xFF07132C) else TextHi
+                    color = if (ringing) Color(0xFF07132C) else CallTextHi
                 )
             }
         }
@@ -388,11 +388,11 @@ private fun CallCircleButton(
             Icon(
                 icon,
                 contentDescription = label,
-                tint = if (color == Color(0xFF22314A)) TextHi else Color(0xFF07132C),
+                tint = if (color == Color(0xFF22314A)) CallTextHi else Color(0xFF07132C),
                 modifier = Modifier.size(32.dp)
             )
         }
         Spacer(Modifier.height(10.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = TextMid)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = CallTextMid)
     }
 }

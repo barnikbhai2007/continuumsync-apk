@@ -5,3 +5,5 @@
 -keep class dev.continuumsync.bridge.clipboard.ClipboardAccessibilityService { *; }
 -keep class dev.continuumsync.bridge.clipboard.ClipboardTileService { *; }
 -keep class dev.continuumsync.bridge.service.SyncForegroundService { *; }
+-keep class com.journeyapps.** { *; }
+-keep class com.google.zxing.** { *; }

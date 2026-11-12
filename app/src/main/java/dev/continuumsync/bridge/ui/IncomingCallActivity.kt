@@ -25,7 +25,7 @@ import dev.continuumsync.bridge.clipboard.ClipboardBridge
 import dev.continuumsync.bridge.data.CallSnapshot
 import dev.continuumsync.bridge.data.SyncRepository
 import dev.continuumsync.bridge.service.SyncForegroundService
-import dev.continuumsync.bridge.ui.theme.Bg
+import dev.continuumsync.bridge.ui.theme.CallBg
 import dev.continuumsync.bridge.ui.theme.ContinuumTheme
 import kotlinx.coroutines.delay
 
@@ -82,7 +82,7 @@ class IncomingCallActivity : ComponentActivity() {
             Box(
                 Modifier
                     .fillMaxSize()
-                    .background(Bg),
+                    .background(CallBg),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator(color = Color(0xFF2BD9A8))
