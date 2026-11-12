@@ -111,8 +111,10 @@ fun ContinuumApp(initialPairingLink: String? = null) {
         }
         if (payload.hostUrl.isNotBlank()) {
             baseUrl = SyncPrefs.normalizeBaseUrl(payload.hostUrl)
-            autoDiscover = false
-            prefs.autoDiscover = false
+            // Keep discovery on: it is faster if the host IP changes, and the
+            // scanned address is still used as the fallback.
+            autoDiscover = true
+            prefs.autoDiscover = true
         } else {
             autoDiscover = true
             prefs.autoDiscover = true

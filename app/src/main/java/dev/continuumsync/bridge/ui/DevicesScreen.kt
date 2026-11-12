@@ -193,7 +193,7 @@ fun DevicesScreen(
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                room.replace('-', ' '),
+                                room,
                                 style = MaterialTheme.typography.headlineLarge.copy(
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
@@ -310,7 +310,7 @@ fun DevicesScreen(
                             )
                             Spacer(Modifier.weight(1f))
                             Text(
-                                room.replace('-', ' '),
+                                room,
                                 style = MaterialTheme.typography.titleLarge.copy(
                                     fontFamily = FontFamily.Monospace
                                 ),
