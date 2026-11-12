@@ -33,6 +33,7 @@ object ClipboardBridge {
 
     private const val TAG = "ContinuumClipboard"
     private const val FALLBACK_POLL_MS = 6_000L
+    private const val IME_POLL_MS = 1_000L
     private const val OVERLAY_SETTLE_MS = 220L
     private const val REPEAT_GUARD_MS = 300L
 
@@ -66,10 +67,21 @@ object ClipboardBridge {
     private val poller = object : Runnable {
         override fun run() {
             if (!started) return
+            // Reading the clipboard in the background needs a focusable
+            // overlay. Doing that while an input method is open steals focus
+            // from the text field and makes the keyboard flicker, so wait for
+            // the keyboard to close and check again shortly.
+            if (isImeVisible()) {
+                handler.postDelayed(this, IME_POLL_MS)
+                return
+            }
             captureClipboard()
             handler.postDelayed(this, FALLBACK_POLL_MS)
         }
     }
+
+    private fun isImeVisible(): Boolean =
+        ClipboardAccessibilityService.isImeVisible() == true
 
     fun init(context: Context) {
         if (appContext == null) appContext = context.applicationContext
@@ -133,6 +145,7 @@ object ClipboardBridge {
             return
         }
         if (appVisible) return
+        if (isImeVisible()) return
         if (!canDrawOverlay()) return
 
         withClipboardFocus(
@@ -305,16 +318,26 @@ object ClipboardBridge {
                 WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                    // Keep the current input method visible while this window
+                    // takes focus only long enough to read the clipboard.
+                    WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM,
                 PixelFormat.TRANSLUCENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
                 x = 0
                 y = 0
+                softInputMode =
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_UNCHANGED or
+                        WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
             }
             windowManager.addView(view, params)
             view.requestFocus()
-            view.postDelayed({
+
+            var finished = false
+            fun finish() {
+                if (finished) return
+                finished = true
                 try {
                     action(manager)
                 } catch (error: Exception) {
@@ -327,7 +350,17 @@ object ClipboardBridge {
                     busy = false
                     onDone?.invoke()
                 }
-            }, OVERLAY_SETTLE_MS)
+            }
+
+            // Read as soon as the window actually owns focus. This keeps the
+            // focus steal to roughly one frame instead of a fixed delay, so
+            // typing is not interrupted on devices where the IME check is
+            // unavailable.
+            view.viewTreeObserver.addOnWindowFocusChangeListener { hasFocus ->
+                if (hasFocus) view.post { finish() }
+            }
+            // Safety net for ROMs that do not deliver the focus callback.
+            view.postDelayed({ finish() }, OVERLAY_SETTLE_MS)
         } catch (error: Exception) {
             Log.w(TAG, "focus overlay failed: ${error.message}")
             if (overlay != null) {

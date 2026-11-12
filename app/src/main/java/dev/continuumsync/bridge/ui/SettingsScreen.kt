@@ -323,8 +323,8 @@ fun SettingsScreen(
                     )
                     PermissionRow(
                         icon = Icons.Rounded.Accessibility,
-                        title = "Clipboard backup",
-                        subtitle = "Optional accessibility helper",
+                        title = "Smooth clipboard",
+                        subtitle = "Avoids interrupting typing · optional",
                         granted = accessibilityGranted,
                         onClick = onOpenAccessibility
                     )

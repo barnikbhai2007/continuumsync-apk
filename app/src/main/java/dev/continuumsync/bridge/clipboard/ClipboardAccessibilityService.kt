@@ -10,6 +10,7 @@ import android.os.PersistableBundle
 import android.service.quicksettings.TileService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 import dev.continuumsync.bridge.data.ClipboardApplier
 import dev.continuumsync.bridge.data.ClipboardReader
@@ -27,6 +28,7 @@ class ClipboardAccessibilityService : AccessibilityService() {
     override fun onServiceConnected() {
         super.onServiceConnected()
         clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        instance = this
         ClipboardBridge.init(this)
         ClipboardBridge.start(this)
         ClipboardReader.read = { readClipboard() }
@@ -70,6 +72,7 @@ class ClipboardAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         ClipboardReader.read = null
         ClipboardApplier.apply = null
         super.onDestroy()
@@ -79,6 +82,26 @@ class ClipboardAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val TAG = "ContinuumClipboard"
+
+        @Volatile
+        private var instance: ClipboardAccessibilityService? = null
+
+        /**
+         * Reports whether an input method window is on screen. Returns null when
+         * the accessibility service is not connected or window inspection is
+         * unavailable, so callers can fall back to the normal clipboard path.
+         */
+        fun isImeVisible(): Boolean? {
+            val service = instance ?: return null
+            return try {
+                service.windows?.any {
+                    it.type == AccessibilityWindowInfo.TYPE_INPUT_METHOD
+                }
+            } catch (error: Exception) {
+                Log.w(TAG, "IME visibility check failed: ${error.message}")
+                null
+            }
+        }
     }
 }
 

@@ -8,7 +8,7 @@ A native two-device bridge for [ContinuumSync](https://github.com/barnikbhai2007
 
 The APK is built automatically by GitHub Actions on every push to `main`. From 2.0.1 onward it is signed with a stable project key, so newer builds install over the previous one. Android will ask you to allow installs from your browser or file manager.
 
-- Current: 2.2.0 (versionCode 6)
+- Current: 2.2.1 (versionCode 7)
 - Minimum: Android 9 (API 28)
 - Target: Android 15 (API 35)
 - Size: about 3.1 MB
@@ -36,13 +36,13 @@ The APK is built automatically by GitHub Actions on every push to `main`. From 2
 4. Grant the device-access permissions on both devices:
    - Notification listener access (mirror, reply and dismiss alerts)
    - **Display over other apps** (instant clipboard sync on Android 10+)
-   - Accessibility service (optional clipboard backup)
+   - Accessibility service (optional, recommended — pauses clipboard reads while the keyboard is open so typing is never interrupted)
    - Phone, call log, and contact permissions (only on the device with the SIM — caller name and call control)
 5. The status pill turns **Linked** when both devices are connected. Use **Test alert**, **Clipboard**, and **Test call** under Settings to verify the bridge.
 
 > Both devices must be on the same Wi-Fi network, and the host must stay open or running its foreground service. Networks that isolate clients (guest Wi-Fi, some routers) block device-to-device traffic; use the normal Wi-Fi network or a hotspot instead.
 
-> **Clipboard note:** Android 10+ blocks background clipboard access for every app, including accessibility services. ContinuumSync shows a 2×2 px focusable overlay for ~220 ms each time it reads or writes the clipboard, which requires the "Display over other apps" permission on both devices.
+> **Clipboard note:** Android 10+ blocks background clipboard access for every app, including accessibility services. ContinuumSync shows a tiny focusable overlay only long enough to read or write the clipboard, which requires the "Display over other apps" permission on both devices. The overlay is marked IME-neutral so the keyboard stays open, and with the accessibility helper enabled the bridge pauses reads entirely while you are typing.
 
 > **Call note:** call audio stays on the device that owns the SIM. The other device mirrors the caller and provides Answer, Decline and End controls.
 
